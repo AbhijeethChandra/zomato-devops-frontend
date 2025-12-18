@@ -20,10 +20,17 @@ export default function Home() {
       .catch(() => setLoading(false));
   }, []);
 
-  const filteredRestaurants = restaurants.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    (r.cuisine ?? []).join(" ").toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRestaurants =
+  search.trim().length === 0
+    ? restaurants
+    : restaurants.filter((r) => {
+        const nameMatch = r.name?.toLowerCase().includes(search.toLowerCase());
+        const cuisineMatch = Array.isArray(r.cuisine)
+          ? r.cuisine.join(" ").toLowerCase().includes(search.toLowerCase())
+          : false;
+
+        return nameMatch || cuisineMatch;
+      });
 
   if (loading) {
     return (
