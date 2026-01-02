@@ -36,3 +36,56 @@ Example:
     }
   ]
 }
+
+
+# Zomato Clone – Dockerized Full Stack App
+
+A Zomato-like food listing application built with a frontend UI and a mock backend API, fully containerized using Docker and orchestrated with Docker Compose.
+
+---
+
+## Tech Stack
+
+- Frontend: Vite + React + TypeScript
+- Backend: json-server (mock REST API)
+- Web Server: Nginx
+- Containerization: Docker
+- Orchestration: Docker Compose
+
+---
+
+## Architecture
+
+- Frontend runs inside an Nginx container
+- Backend runs as a json-server container
+- Docker Compose manages networking between services
+
+Browser → Frontend (Nginx) → Backend (json-server)
+
+---
+
+## Services & Ports
+
+| Service   | Port | Description |
+|---------|------|-------------|
+| Frontend | 8081 | UI application |
+| Backend  | 3000 | Restaurants API |
+
+---
+
+## API Endpoint
+
+GET /restaurants
+http://localhost:3000/restaurants
+
+---
+
+## How to Run the Project
+
+```bash
+docker compose up --build -d
+Access:
+
+Frontend → http://localhost:8081
+
+Backend API → http://localhost:3000/restaurants

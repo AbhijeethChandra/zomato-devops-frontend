@@ -1,0 +1,16 @@
+services:
+  backend:
+    build:
+      context: ./mock-api
+    container_name: zomato-backend
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build: .
+    ports:
+      - "8081:80"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend
