@@ -5,24 +5,24 @@ pipeline {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'main',
+                git branch: 'ci-setup',
                     url: 'https://github.com/AbhijeethChandra/zomato-devops-frontend.git'
             }
         }
 
         stage('Frontend Build') {
             steps {
-                sh '''
-                  npm install
-                  npm run build
+                bat '''
+                npm install
+                npm run build
                 '''
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
-                  docker build -t zomato-frontend:ci .
+                bat '''
+                docker build -t zomato-frontend:ci .
                 '''
             }
         }
