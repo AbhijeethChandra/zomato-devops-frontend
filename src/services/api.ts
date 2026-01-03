@@ -1,7 +1,7 @@
 // src/services/api.ts
 import type { Restaurant } from "../types/restaurant";
 
-const BASE = "http://host.docker.internal:3000";
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export async function fetchRestaurants(): Promise<Restaurant[]> {
   const res = await fetch(`${BASE}/restaurants`);
