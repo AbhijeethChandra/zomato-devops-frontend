@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/AbhijeethChandra/zomato-devops-frontend.git'
+            }
+        }
+
+        stage('Docker Build Backend') {
+            steps {
+                bat '''
+                docker build -t zomato-backend:ci mock-api
+                '''
+            }
+        }
+
+        stage('Deploy Backend') {
+            steps {
+                bat '''
+                docker rm -f zomato-backend || exit 0
+                docker run -d ^
+                  --name zomato-backend ^
+                  -p 3000:3000 ^
+                  zomato-backend:ci
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Backend deployed successfully'
+        }
+        failure {
+            echo '❌ Backend deployment failed'
+        }
+    }
+}
