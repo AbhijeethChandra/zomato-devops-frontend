@@ -10,19 +10,33 @@ pipeline {
             }
         }
 
-        stage('Frontend Build') {
+        stage('Install Dependencies') {
             steps {
-                bat '''
-                npm install
-                npm run build
-                '''
+                bat 'npm install'
+            }
+        }
+
+        stage('Build Frontend') {
+            steps {
+                bat 'npm run build'
             }
         }
 
         stage('Docker Build') {
             steps {
+                bat 'docker build -t zomato-frontend:ci .'
+            }
+        }
+
+        stage('Deploy Frontend') {
+            steps {
                 bat '''
-                docker build -t zomato-frontend:ci .
+                docker rm -f zomato-frontend || exit 0
+
+                docker run -d ^
+                  --name zomato-frontend ^
+                  -p 8081:80 ^
+                  zomato-frontend:ci
                 '''
             }
         }
@@ -30,10 +44,10 @@ pipeline {
 
     post {
         success {
-            echo 'Frontend CI pipeline completed successfully'
+            echo '✅ Frontend deployed successfully'
         }
         failure {
-            echo 'Frontend CI pipeline failed'
+            echo '❌ Frontend deployment failed'
         }
     }
 }
