@@ -2,17 +2,14 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_IMAGE = "zomato-frontend:ci"
-        FRONTEND_CONTAINER = "zomato-frontend"
-        FRONTEND_PORT = "8081"
-        SELENIUM_PATH = "C:\\selenium-devops-demo\\selenium-demo"
+        NODE_ENV = 'production'
     }
 
     stages {
 
         stage('Checkout Code') {
             steps {
-                git branch: 'ci-setup',
+                git branch: 'main',
                     url: 'https://github.com/AbhijeethChandra/zomato-devops-frontend.git'
             }
         }
@@ -23,62 +20,66 @@ pipeline {
             }
         }
 
+        stage('Run Frontend Tests') {
+            steps {
+                bat 'npm test -- --watch=false'
+            }
+        }
+
+        stage('SonarQube Scan') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    bat '''
+                    npx sonar-scanner ^
+                      -Dsonar.projectKey=zomato-frontend ^
+                      -Dsonar.projectName=zomato-frontend ^
+                      -Dsonar.sources=src ^
+                      -Dsonar.host.url=http://localhost:9000
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
         stage('Build Frontend') {
             steps {
                 bat 'npm run build'
             }
         }
 
-        stage('Selenium UI Tests') {
-            steps {
-                bat """
-                cd ${SELENIUM_PATH}
-                mvn clean test
-                """
-            }
-        }
-
-        stage('SonarQube Code Scan') {
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    bat '''
-                    sonar-scanner ^
-                      -Dsonar.projectKey=zomato-frontend ^
-                      -Dsonar.projectName=zomato-frontend ^
-                      -Dsonar.sources=src ^
-                      -Dsonar.language=js ^
-                      -Dsonar.sourceEncoding=UTF-8
-                    '''
-                }
-            }
-        }
-
         stage('Docker Build') {
             steps {
-                bat "docker build -t %FRONTEND_IMAGE% ."
+                bat 'docker build -t zomato-frontend:ci .'
             }
         }
 
         stage('Deploy Frontend') {
             steps {
-                bat """
-                docker rm -f %FRONTEND_CONTAINER% || exit 0
+                bat '''
+                docker rm -f zomato-frontend || exit 0
 
                 docker run -d ^
-                  --name %FRONTEND_CONTAINER% ^
-                  -p %FRONTEND_PORT%:80 ^
-                  %FRONTEND_IMAGE%
-                """
+                  --name zomato-frontend ^
+                  -p 8081:80 ^
+                  zomato-frontend:ci
+                '''
             }
         }
     }
 
     post {
         success {
-            echo '✅ Build → Test → Scan → Deploy completed successfully'
+            echo '✅ CI/CD pipeline completed successfully'
         }
         failure {
-            echo '❌ Pipeline failed — deployment blocked'
+            echo '❌ Pipeline failed'
         }
     }
 }
