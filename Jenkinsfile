@@ -1,9 +1,16 @@
 pipeline {
     agent any
 
+    tools {
+        nodejs 'NodeJS'            // if configured
+        maven 'Maven'              // for Selenium tests
+        sonarQubeScanner 'SonarScanner'
+    }
+
     environment {
-        // SonarQube server name as configured in Manage Jenkins → System
-        SONARQUBE_SERVER = 'SonarQube'
+        IMAGE_NAME = "zomato-frontend:ci"
+        CONTAINER_NAME = "zomato-frontend"
+        PORT = "8081"
     }
 
     stages {
@@ -29,7 +36,7 @@ pipeline {
 
         stage('UI Tests - Selenium') {
             steps {
-                echo 'Running Selenium UI tests'
+                echo 'Running Selenium UI Tests'
                 bat '''
                 cd C:\\selenium-devops-demo\\selenium-demo
                 mvn clean test
@@ -39,7 +46,7 @@ pipeline {
 
         stage('SonarQube Scan') {
             steps {
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                withSonarQubeEnv('SonarQube') {
                     bat '''
                     sonar-scanner ^
                       -Dsonar.projectKey=zomato-frontend ^
@@ -53,19 +60,19 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                bat 'docker build -t zomato-frontend:ci .'
+                bat "docker build -t %IMAGE_NAME% ."
             }
         }
 
         stage('Deploy Frontend') {
             steps {
                 bat '''
-                docker rm -f zomato-frontend || exit 0
+                docker rm -f %CONTAINER_NAME% || exit 0
 
                 docker run -d ^
-                  --name zomato-frontend ^
-                  -p 8081:80 ^
-                  zomato-frontend:ci
+                  --name %CONTAINER_NAME% ^
+                  -p %PORT%:80 ^
+                  %IMAGE_NAME%
                 '''
             }
         }
