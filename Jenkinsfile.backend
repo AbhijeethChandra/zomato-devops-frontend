@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        BACKEND_IMAGE = "zomato-backend:ci"
+        TEST_IMAGE    = "zomato-backend-test"
+    }
+
     stages {
 
         stage('Checkout Code') {
@@ -12,7 +17,7 @@ pipeline {
 
         stage('Build Backend Test Image') {
             steps {
-                bat 'docker build -t zomato-backend-test mock-api'
+                bat 'docker build -t %TEST_IMAGE% mock-api'
             }
         }
 
@@ -24,7 +29,7 @@ pipeline {
                 docker run -d ^
                   --name zomato-backend-test ^
                   -p 3001:3000 ^
-                  zomato-backend-test
+                  %TEST_IMAGE%
 
                 echo Waiting for backend to be ready...
 
@@ -34,7 +39,6 @@ pipeline {
                   ping -n 3 127.0.0.1 > nul
                 )
 
-                echo Backend did not respond
                 EXIT /B 1
                 '''
             }
@@ -55,7 +59,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 2, unit: 'MINUTES') {
+                timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -63,7 +67,7 @@ pipeline {
 
         stage('Build Backend Image') {
             steps {
-                bat 'docker build -t zomato-backend:ci mock-api'
+                bat 'docker build -t %BACKEND_IMAGE% mock-api'
             }
         }
 
@@ -75,7 +79,7 @@ pipeline {
                 docker run -d ^
                   --name zomato-backend ^
                   -p 3000:3000 ^
-                  zomato-backend:ci
+                  %BACKEND_IMAGE%
                 '''
             }
         }
@@ -83,7 +87,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend CI/CD completed with Quality Gate PASSED'
+            echo '✅ Backend deployed successfully with Quality Gate PASSED'
         }
         failure {
             echo '❌ Pipeline failed – Tests or Quality Gate FAILED'
