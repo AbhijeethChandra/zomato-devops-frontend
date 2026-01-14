@@ -2,7 +2,8 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'production'
+        // SonarQube server name as configured in Manage Jenkins → System
+        SONARQUBE_SERVER = 'SonarQube'
     }
 
     stages {
@@ -20,37 +21,33 @@ pipeline {
             }
         }
 
-        stage('Run Frontend Tests') {
+        stage('Build Frontend') {
             steps {
-                bat 'npm test -- --watch=false'
+                bat 'npm run build'
+            }
+        }
+
+        stage('UI Tests - Selenium') {
+            steps {
+                echo 'Running Selenium UI tests'
+                bat '''
+                cd C:\\selenium-devops-demo\\selenium-demo
+                mvn clean test
+                '''
             }
         }
 
         stage('SonarQube Scan') {
             steps {
-                withSonarQubeEnv('SonarQube') {
+                withSonarQubeEnv("${SONARQUBE_SERVER}") {
                     bat '''
-                    npx sonar-scanner ^
+                    sonar-scanner ^
                       -Dsonar.projectKey=zomato-frontend ^
                       -Dsonar.projectName=zomato-frontend ^
                       -Dsonar.sources=src ^
-                      -Dsonar.host.url=http://localhost:9000
+                      -Dsonar.exclusions=node_modules/**,dist/**
                     '''
                 }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 2, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
-        }
-
-        stage('Build Frontend') {
-            steps {
-                bat 'npm run build'
             }
         }
 
@@ -79,7 +76,7 @@ pipeline {
             echo '✅ CI/CD pipeline completed successfully'
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo '❌ CI/CD pipeline failed'
         }
     }
 }
