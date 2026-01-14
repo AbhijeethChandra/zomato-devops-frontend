@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS'            // if configured
-        maven 'Maven'              // for Selenium tests
-        sonarQubeScanner 'SonarScanner'
-    }
-
     environment {
         IMAGE_NAME = "zomato-frontend:ci"
         CONTAINER_NAME = "zomato-frontend"
@@ -60,19 +54,19 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                bat "docker build -t %IMAGE_NAME% ."
+                bat 'docker build -t zomato-frontend:ci .'
             }
         }
 
         stage('Deploy Frontend') {
             steps {
                 bat '''
-                docker rm -f %CONTAINER_NAME% || exit 0
+                docker rm -f zomato-frontend || exit 0
 
                 docker run -d ^
-                  --name %CONTAINER_NAME% ^
-                  -p %PORT%:80 ^
-                  %IMAGE_NAME%
+                  --name zomato-frontend ^
+                  -p 8081:80 ^
+                  zomato-frontend:ci
                 '''
             }
         }
