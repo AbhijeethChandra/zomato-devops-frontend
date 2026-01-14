@@ -42,7 +42,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     bat '''
-                    sonar-scanner ^
+                    npx sonar-scanner ^
                       -Dsonar.projectKey=zomato-frontend ^
                       -Dsonar.projectName=zomato-frontend ^
                       -Dsonar.sources=src ^
