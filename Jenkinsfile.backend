@@ -2,8 +2,6 @@ pipeline {
     agent any
 
     environment {
-        BACKEND_IMAGE = "zomato-backend:ci"
-        TEST_IMAGE = "zomato-backend-test"
         SONAR_PROJECT_KEY = "zomato-backend"
     }
 
@@ -18,9 +16,7 @@ pipeline {
 
         stage('Build Backend Test Image') {
             steps {
-                bat '''
-                docker build -t %TEST_IMAGE% mock-api
-                '''
+                bat 'docker build -t zomato-backend-test mock-api'
             }
         }
 
@@ -32,10 +28,10 @@ pipeline {
                 docker run -d ^
                   --name backend-test ^
                   -p 3001:3000 ^
-                  %TEST_IMAGE%
+                  zomato-backend-test
 
                 echo Waiting for backend to start...
-                ping -n 6 127.0.0.1 > nul
+                ping -n 6 127.0.0.1 >nul
 
                 echo Testing API endpoint...
                 curl http://localhost:3001/restaurants
@@ -48,21 +44,22 @@ pipeline {
         stage('SonarQube Scan (Backend)') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    bat '''
-                    sonar-scanner ^
-                      -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
-                      -Dsonar.sources=mock-api ^
-                      -Dsonar.language=js
-                    '''
+                    script {
+                        def scannerHome = tool 'SonarScanner'
+                        bat """
+                        "${scannerHome}\\bin\\sonar-scanner.bat" ^
+                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} ^
+                          -Dsonar.sources=mock-api ^
+                          -Dsonar.language=js
+                        """
+                    }
                 }
             }
         }
 
         stage('Build Backend Image') {
             steps {
-                bat '''
-                docker build -t %BACKEND_IMAGE% mock-api
-                '''
+                bat 'docker build -t zomato-backend:ci mock-api'
             }
         }
 
@@ -74,7 +71,7 @@ pipeline {
                 docker run -d ^
                   --name zomato-backend ^
                   -p 3000:3000 ^
-                  %BACKEND_IMAGE%
+                  zomato-backend:ci
                 '''
             }
         }
