@@ -1,8 +1,8 @@
 pipeline {
     agent any
 
-    environment {
-        SONARQUBE_SERVER = 'SonarQube'
+    tools {
+        sonarScanner 'SonarScanner'
     }
 
     stages {
@@ -33,12 +33,12 @@ pipeline {
                 echo Waiting for backend to be ready...
 
                 FOR /L %%i IN (1,1,10) DO (
-                    curl http://localhost:3001/restaurants && EXIT /B 0
-                    echo Retry %%i...
-                    ping -n 3 127.0.0.1 > nul
+                  curl http://localhost:3001/restaurants && EXIT /B 0
+                  echo Retry %%i...
+                  ping -n 3 127.0.0.1 > nul
                 )
 
-                echo Backend API did not respond
+                echo Backend did not respond
                 EXIT /B 1
                 '''
             }
@@ -87,7 +87,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend CI/CD completed successfully'
+            echo '✅ Backend CI/CD completed with Quality Gate PASSED'
         }
         failure {
             echo '❌ Pipeline failed – Tests or Quality Gate FAILED'
