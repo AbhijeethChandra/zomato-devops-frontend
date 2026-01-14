@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "zomato-backend:ci"
+        CONTAINER_NAME = "zomato-backend"
+        SONAR_PROJECT_KEY = "zomato-backend"
+    }
+
     stages {
 
         stage('Checkout Code') {
@@ -10,22 +16,58 @@ pipeline {
             }
         }
 
-        stage('Docker Build Backend') {
+        stage('Backend API Test (Smoke Test)') {
             steps {
                 bat '''
-                docker build -t zomato-backend:ci mock-api
+                echo "Starting temporary backend container for testing..."
+
+                docker rm -f backend-test || exit 0
+
+                docker build -t backend-test-image ./mock-api
+
+                docker run -d ^
+                  --name backend-test ^
+                  -p 3001:3000 ^
+                  backend-test-image
+
+                timeout /t 5
+
+                echo "Testing API endpoint..."
+                curl http://localhost:3001/restaurants
+
+                docker rm -f backend-test
                 '''
+            }
+        }
+
+        stage('SonarQube Scan (Backend)') {
+            steps {
+                withSonarQubeEnv('sonarqube') {
+                    bat '''
+                    sonar-scanner ^
+                      -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
+                      -Dsonar.sources=mock-api ^
+                      -Dsonar.host.url=http://localhost:9000
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Build (Backend)') {
+            steps {
+                bat 'docker build -t %IMAGE_NAME% ./mock-api'
             }
         }
 
         stage('Deploy Backend') {
             steps {
                 bat '''
-                docker rm -f zomato-backend || exit 0
+                docker rm -f %CONTAINER_NAME% || exit 0
+
                 docker run -d ^
-                  --name zomato-backend ^
+                  --name %CONTAINER_NAME% ^
                   -p 3000:3000 ^
-                  zomato-backend:ci
+                  %IMAGE_NAME%
                 '''
             }
         }
@@ -33,10 +75,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend deployed successfully'
+            echo '✅ Backend CI/CD completed successfully'
         }
         failure {
-            echo '❌ Backend deployment failed'
+            echo '❌ Backend CI/CD failed'
         }
     }
 }
