@@ -2,37 +2,42 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "zomato-backend:ci"
-        CONTAINER_NAME = "zomato-backend"
+        BACKEND_IMAGE = "zomato-backend:ci"
+        TEST_IMAGE = "zomato-backend-test"
         SONAR_PROJECT_KEY = "zomato-backend"
     }
 
     stages {
 
-        stage('Checkout Code') {
+        stage('Checkout Backend Code') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/AbhijeethChandra/zomato-devops-frontend.git'
             }
         }
 
-        stage('Backend API Test (Smoke Test)') {
+        stage('Build Backend Test Image') {
             steps {
                 bat '''
-                echo "Starting temporary backend container for testing..."
+                docker build -t %TEST_IMAGE% mock-api
+                '''
+            }
+        }
 
+        stage('Run Backend & API Smoke Test') {
+            steps {
+                bat '''
                 docker rm -f backend-test || exit 0
-
-                docker build -t backend-test-image ./mock-api
 
                 docker run -d ^
                   --name backend-test ^
                   -p 3001:3000 ^
-                  backend-test-image
+                  %TEST_IMAGE%
 
-                timeout /t 5
+                echo Waiting for backend to start...
+                ping -n 6 127.0.0.1 > nul
 
-                echo "Testing API endpoint..."
+                echo Testing API endpoint...
                 curl http://localhost:3001/restaurants
 
                 docker rm -f backend-test
@@ -42,32 +47,34 @@ pipeline {
 
         stage('SonarQube Scan (Backend)') {
             steps {
-                withSonarQubeEnv('sonarqube') {
+                withSonarQubeEnv('SonarQube') {
                     bat '''
                     sonar-scanner ^
                       -Dsonar.projectKey=%SONAR_PROJECT_KEY% ^
                       -Dsonar.sources=mock-api ^
-                      -Dsonar.host.url=http://localhost:9000
+                      -Dsonar.language=js
                     '''
                 }
             }
         }
 
-        stage('Docker Build (Backend)') {
+        stage('Build Backend Image') {
             steps {
-                bat 'docker build -t %IMAGE_NAME% ./mock-api'
+                bat '''
+                docker build -t %BACKEND_IMAGE% mock-api
+                '''
             }
         }
 
         stage('Deploy Backend') {
             steps {
                 bat '''
-                docker rm -f %CONTAINER_NAME% || exit 0
+                docker rm -f zomato-backend || exit 0
 
                 docker run -d ^
-                  --name %CONTAINER_NAME% ^
+                  --name zomato-backend ^
                   -p 3000:3000 ^
-                  %IMAGE_NAME%
+                  %BACKEND_IMAGE%
                 '''
             }
         }
