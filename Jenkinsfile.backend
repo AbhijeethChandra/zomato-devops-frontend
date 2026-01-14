@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE_ENV = 'SonarQube'
-        SONAR_SCANNER = 'SonarScanner'
+        SONARQUBE_SERVER = 'SonarQube'
     }
 
     stages {
@@ -31,9 +30,16 @@ pipeline {
                   -p 3001:3000 ^
                   zomato-backend-test
 
-                timeout /t 10
+                echo Waiting for backend to be ready...
 
-                curl http://localhost:3001/restaurants || exit 1
+                FOR /L %%i IN (1,1,10) DO (
+                    curl http://localhost:3001/restaurants && EXIT /B 0
+                    echo Retry %%i...
+                    ping -n 3 127.0.0.1 > nul
+                )
+
+                echo Backend API did not respond
+                EXIT /B 1
                 '''
             }
         }
@@ -41,13 +47,12 @@ pipeline {
         stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    bat """
-                    ${tool 'SonarScanner'}\\bin\\sonar-scanner ^
+                    bat '''
+                    sonar-scanner ^
                       -Dsonar.projectKey=zomato-backend ^
                       -Dsonar.projectName=zomato-backend ^
-                      -Dsonar.sources=mock-api ^
-                      -Dsonar.host.url=http://localhost:9000
-                    """
+                      -Dsonar.sources=mock-api
+                    '''
                 }
             }
         }
@@ -82,7 +87,7 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend CI/CD completed with Quality Gate PASSED'
+            echo '✅ Backend CI/CD completed successfully'
         }
         failure {
             echo '❌ Pipeline failed – Tests or Quality Gate FAILED'
