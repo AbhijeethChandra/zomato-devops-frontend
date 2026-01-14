@@ -3,7 +3,8 @@ pipeline {
 
     environment {
         BACKEND_IMAGE = "zomato-backend:ci"
-        TEST_IMAGE    = "zomato-backend-test"
+        TEST_CONTAINER = "zomato-backend-test"
+        PROD_CONTAINER = "zomato-backend"
     }
 
     stages {
@@ -17,29 +18,30 @@ pipeline {
 
         stage('Build Backend Test Image') {
             steps {
-                bat 'docker build -t %TEST_IMAGE% mock-api'
+                bat 'docker build -t zomato-backend-test mock-api'
             }
         }
 
         stage('Backend API Smoke Test') {
             steps {
                 bat '''
-                docker rm -f zomato-backend-test || exit 0
+                docker rm -f %TEST_CONTAINER% || exit 0
 
                 docker run -d ^
-                  --name zomato-backend-test ^
+                  --name %TEST_CONTAINER% ^
                   -p 3001:3000 ^
-                  %TEST_IMAGE%
+                  zomato-backend-test
 
                 echo Waiting for backend to be ready...
 
-                FOR /L %%i IN (1,1,10) DO (
+                FOR /L %%i IN (1 1 10) DO (
                   curl http://localhost:3001/restaurants && EXIT /B 0
                   echo Retry %%i...
                   ping -n 3 127.0.0.1 > nul
                 )
 
-                EXIT /B 1
+                echo Backend did not respond
+                exit /B 1
                 '''
             }
         }
@@ -59,7 +61,7 @@ pipeline {
 
         stage('Quality Gate') {
             steps {
-                timeout(time: 5, unit: 'MINUTES') {
+                timeout(time: 2, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -74,10 +76,10 @@ pipeline {
         stage('Deploy Backend') {
             steps {
                 bat '''
-                docker rm -f zomato-backend || exit 0
+                docker rm -f %PROD_CONTAINER% || exit 0
 
                 docker run -d ^
-                  --name zomato-backend ^
+                  --name %PROD_CONTAINER% ^
                   -p 3000:3000 ^
                   %BACKEND_IMAGE%
                 '''
