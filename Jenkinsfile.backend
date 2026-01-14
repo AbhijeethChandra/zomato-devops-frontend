@@ -2,12 +2,15 @@ pipeline {
     agent any
 
     environment {
-        SONAR_PROJECT_KEY = "zomato-backend"
+        BACKEND_TEST_CONTAINER = "zomato-backend-test"
+        BACKEND_PROD_CONTAINER = "zomato-backend"
+        IMAGE_TEST = "zomato-backend-test"
+        IMAGE_PROD = "zomato-backend:ci"
     }
 
     stages {
 
-        stage('Checkout Backend Code') {
+        stage('Checkout Code') {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/AbhijeethChandra/zomato-devops-frontend.git'
@@ -16,62 +19,65 @@ pipeline {
 
         stage('Build Backend Test Image') {
             steps {
-                bat 'docker build -t zomato-backend-test mock-api'
+                bat 'docker build -t %IMAGE_TEST% mock-api'
             }
         }
 
-        stage('Run Backend & API Smoke Test') {
+        stage('Backend API Smoke Test') {
             steps {
                 bat '''
-                docker rm -f backend-test || exit 0
+                docker rm -f %BACKEND_TEST_CONTAINER% || exit 0
 
                 docker run -d ^
-                  --name backend-test ^
+                  --name %BACKEND_TEST_CONTAINER% ^
                   -p 3001:3000 ^
-                  zomato-backend-test
+                  %IMAGE_TEST%
 
-                echo Waiting for backend to start...
-                ping -n 6 127.0.0.1 >nul
+                timeout /t 10
 
-                echo Testing API endpoint...
-                curl http://localhost:3001/restaurants
+                curl http://localhost:3001/restaurants || exit 1
 
-                docker rm -f backend-test
+                docker rm -f %BACKEND_TEST_CONTAINER%
                 '''
             }
         }
 
-        stage('SonarQube Scan (Backend)') {
+        stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    script {
-                        def scannerHome = tool 'SonarScanner'
-                        bat """
-                        "${scannerHome}\\bin\\sonar-scanner.bat" ^
-                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} ^
-                          -Dsonar.sources=mock-api ^
-                          -Dsonar.language=js
-                        """
-                    }
+                    bat '''
+                    sonar-scanner ^
+                      -Dsonar.projectKey=zomato-backend ^
+                      -Dsonar.sources=mock-api ^
+                      -Dsonar.language=js
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 2, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
 
         stage('Build Backend Image') {
             steps {
-                bat 'docker build -t zomato-backend:ci mock-api'
+                bat 'docker build -t %IMAGE_PROD% mock-api'
             }
         }
 
         stage('Deploy Backend') {
             steps {
                 bat '''
-                docker rm -f zomato-backend || exit 0
+                docker rm -f %BACKEND_PROD_CONTAINER% || exit 0
 
                 docker run -d ^
-                  --name zomato-backend ^
+                  --name %BACKEND_PROD_CONTAINER% ^
                   -p 3000:3000 ^
-                  zomato-backend:ci
+                  %IMAGE_PROD%
                 '''
             }
         }
@@ -79,10 +85,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend CI/CD completed successfully'
+            echo '✅ Backend deployed – Quality Gate PASSED'
         }
         failure {
-            echo '❌ Backend CI/CD failed'
+            echo '❌ Pipeline failed – Quality Gate or Tests FAILED'
         }
     }
 }
