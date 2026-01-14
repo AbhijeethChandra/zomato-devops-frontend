@@ -2,10 +2,8 @@ pipeline {
     agent any
 
     environment {
-        BACKEND_TEST_CONTAINER = "zomato-backend-test"
-        BACKEND_PROD_CONTAINER = "zomato-backend"
-        IMAGE_TEST = "zomato-backend-test"
-        IMAGE_PROD = "zomato-backend:ci"
+        SONARQUBE_ENV = 'SonarQube'
+        SONAR_SCANNER = 'SonarScanner'
     }
 
     stages {
@@ -19,25 +17,23 @@ pipeline {
 
         stage('Build Backend Test Image') {
             steps {
-                bat 'docker build -t %IMAGE_TEST% mock-api'
+                bat 'docker build -t zomato-backend-test mock-api'
             }
         }
 
         stage('Backend API Smoke Test') {
             steps {
                 bat '''
-                docker rm -f %BACKEND_TEST_CONTAINER% || exit 0
+                docker rm -f zomato-backend-test || exit 0
 
                 docker run -d ^
-                  --name %BACKEND_TEST_CONTAINER% ^
+                  --name zomato-backend-test ^
                   -p 3001:3000 ^
-                  %IMAGE_TEST%
+                  zomato-backend-test
 
                 timeout /t 10
 
                 curl http://localhost:3001/restaurants || exit 1
-
-                docker rm -f %BACKEND_TEST_CONTAINER%
                 '''
             }
         }
@@ -45,12 +41,13 @@ pipeline {
         stage('SonarQube Scan') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    bat '''
-                    sonar-scanner ^
+                    bat """
+                    ${tool 'SonarScanner'}\\bin\\sonar-scanner ^
                       -Dsonar.projectKey=zomato-backend ^
+                      -Dsonar.projectName=zomato-backend ^
                       -Dsonar.sources=mock-api ^
-                      -Dsonar.language=js
-                    '''
+                      -Dsonar.host.url=http://localhost:9000
+                    """
                 }
             }
         }
@@ -65,19 +62,19 @@ pipeline {
 
         stage('Build Backend Image') {
             steps {
-                bat 'docker build -t %IMAGE_PROD% mock-api'
+                bat 'docker build -t zomato-backend:ci mock-api'
             }
         }
 
         stage('Deploy Backend') {
             steps {
                 bat '''
-                docker rm -f %BACKEND_PROD_CONTAINER% || exit 0
+                docker rm -f zomato-backend || exit 0
 
                 docker run -d ^
-                  --name %BACKEND_PROD_CONTAINER% ^
+                  --name zomato-backend ^
                   -p 3000:3000 ^
-                  %IMAGE_PROD%
+                  zomato-backend:ci
                 '''
             }
         }
@@ -85,10 +82,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Backend deployed – Quality Gate PASSED'
+            echo '✅ Backend CI/CD completed with Quality Gate PASSED'
         }
         failure {
-            echo '❌ Pipeline failed – Quality Gate or Tests FAILED'
+            echo '❌ Pipeline failed – Tests or Quality Gate FAILED'
         }
     }
 }
